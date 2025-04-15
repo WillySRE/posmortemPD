@@ -1,0 +1,35 @@
+name: Crear PostMortem desde Webhook
+
+on:
+  repository_dispatch:
+    types: [crear_postmortem]
+
+jobs:
+  generar_postmortem:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Leer plantilla
+        id: plantilla
+        run: |
+          TEMPLATE=$(cat templates/postmortem_template.md)
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          echo "$TEMPLATE" | sed "s/{INCIDENT_ID}/${{ github.event.client_payload.incident_id }}/g" | \
+                          sed "s/{FECHA}/${{ github.event.client_payload.fecha }}/g" | \
+                          sed "s/{SERVICIO}/${{ github.event.client_payload.servicio }}/g" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Crear archivo
+        run: |
+          FILE_NAME=postmortems/postmortem-${{ github.event.client_payload.incident_id }}.md
+          echo "${{ steps.plantilla.outputs.content }}" > $FILE_NAME
+
+      - name: Commit y push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add postmortems/
+          git commit -m "Nuevo PostMortem para incidente ${{ github.event.client_payload.incident_id }}"
+          git push
